@@ -126,6 +126,8 @@ enum slurm_native {
 	SLURM_NATIVE_NODELIST,
 	SLURM_NATIVE_NODES,
 	SLURM_NATIVE_NTASKS_PER_NODE,
+	SLURM_NATIVE_NTASKS_PER_SOCKET,
+	SLURM_NATIVE_NTASKS_PER_CORE,
 	SLURM_NATIVE_PARTITION,
 	SLURM_NATIVE_QOS,
 	SLURM_NATIVE_REQUEUE,
@@ -284,6 +286,14 @@ slurmdrmaa_add_attribute(job_desc_msg_t *job_desc, unsigned attr, const char *va
 			fsd_log_debug(("# ntasks_per_node = %s",value));
 			job_desc->ntasks_per_node = fsd_atoi(value);
 			break;
+		case SLURM_NATIVE_NTASKS_PER_SOCKET:
+			fsd_log_debug(("# ntasks_per_socket = %s",value));
+			job_desc->ntasks_per_socket = fsd_atoi(value);
+			break;
+		case SLURM_NATIVE_NTASKS_PER_CORE:
+			fsd_log_debug(("# ntasks_per_core = %s",value));
+			job_desc->ntasks_per_core = fsd_atoi(value);
+			break;
 		case SLURM_NATIVE_PARTITION:
 			fsd_free(job_desc->partition);
 			fsd_log_debug(("# partition = %s",value));
@@ -422,6 +432,12 @@ slurmdrmaa_parse_additional_attr(job_desc_msg_t *job_desc,const char *add_attr)
 		}
 		else if (strcmp(name,"ntasks-per-node") == 0) {
 			slurmdrmaa_add_attribute(job_desc,SLURM_NATIVE_NTASKS_PER_NODE,value);
+		}
+		else if (strcmp(name,"ntasks-per-socket") == 0) {
+			slurmdrmaa_add_attribute(job_desc,SLURM_NATIVE_NTASKS_PER_SOCKET,value);
+		}
+		else if (strcmp(name,"ntasks-per-core") == 0) {
+			slurmdrmaa_add_attribute(job_desc,SLURM_NATIVE_NTASKS_PER_CORE,value);
 		}
 		else if (strcmp(name,"partition") == 0) {
 			slurmdrmaa_add_attribute(job_desc,SLURM_NATIVE_PARTITION,value);
