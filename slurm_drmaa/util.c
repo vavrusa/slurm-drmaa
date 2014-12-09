@@ -119,6 +119,7 @@ enum slurm_native {
 	SLURM_NATIVE_COMMENT,
 	SLURM_NATIVE_CONSTRAINT,
 	SLURM_NATIVE_CONTIGUOUS,
+	SLURM_NATIVE_CPUS_PER_TASK,
 	SLURM_NATIVE_EXCLUSIVE,
 	SLURM_NATIVE_MEM,
 	SLURM_NATIVE_MEM_PER_CPU,
@@ -214,6 +215,10 @@ slurmdrmaa_add_attribute(job_desc_msg_t *job_desc, unsigned attr, const char *va
 		case SLURM_NATIVE_CONTIGUOUS:
 			fsd_log_debug(( "# contiguous = 1"));
 			job_desc->contiguous = 1;
+			break;
+		case SLURM_NATIVE_CPUS_PER_TASK:
+			fsd_log_debug(("# cpus_per_task = %s",value));
+			job_desc->cpus_per_task = fsd_atoi(value);
 			break;
 		case SLURM_NATIVE_EXCLUSIVE:
 			fsd_log_debug(( "# exclusive -> shared = 0"));
@@ -412,6 +417,9 @@ slurmdrmaa_parse_additional_attr(job_desc_msg_t *job_desc,const char *add_attr)
 		else if (strcmp(name,"contiguous") == 0) {
 			slurmdrmaa_add_attribute(job_desc,SLURM_NATIVE_CONTIGUOUS,NULL);
 		}
+		else if (strcmp(name,"cpus-per-task") == 0) {
+			slurmdrmaa_add_attribute(job_desc,SLURM_NATIVE_CPUS_PER_TASK,value);
+		}
 		else if(strcmp(name,"exclusive") == 0) {
 			slurmdrmaa_add_attribute(job_desc,SLURM_NATIVE_EXCLUSIVE,NULL);
 		}
@@ -536,10 +544,13 @@ slurmdrmaa_parse_native(job_desc_msg_t *job_desc, const char * value)
 						break;
 					case 'C' :
 						slurmdrmaa_add_attribute(job_desc,SLURM_NATIVE_CONSTRAINT, arg);
-						break;	
-					case 'N' :	
+						break;
+					case 'c' :
+						slurmdrmaa_add_attribute(job_desc,SLURM_NATIVE_CPUS_PER_TASK, arg);
+						break;
+					case 'N' :
 						slurmdrmaa_add_attribute(job_desc,SLURM_NATIVE_NODES, arg);
-						break;	
+						break;
 					case 'p' :
 						slurmdrmaa_add_attribute(job_desc,SLURM_NATIVE_PARTITION, arg);
 						break;
