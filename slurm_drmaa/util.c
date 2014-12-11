@@ -200,7 +200,7 @@ slurmdrmaa_add_attribute(job_desc_msg_t *job_desc, unsigned attr, const char *va
 			break;
 		case SLURM_NATIVE_ACCTG_FREQ:
 			fsd_log_debug(("# acctg_freq = %s",value));
-			job_desc->acctg_freq = fsd_atoi(value);
+			job_desc->acctg_freq = fsd_strdup(value);
 			break;
 		case SLURM_NATIVE_COMMENT:
 			fsd_free(job_desc->comment);
@@ -322,7 +322,7 @@ slurmdrmaa_add_attribute(job_desc_msg_t *job_desc, unsigned attr, const char *va
 			job_desc->shared = 1;
 			break;
 		case SLURM_NATIVE_JOB_NAME:
-			fsd_log_debug(("# job_name = %s",job_desc->name));
+			fsd_log_debug(("# job_name = %s",value));
 			job_desc->name = fsd_strdup(value);
 			break;
 		case SLURM_NATIVE_NTASKS:
