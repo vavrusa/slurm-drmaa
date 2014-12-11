@@ -110,11 +110,31 @@ slurmdrmaa_job_control( fsd_job_t *self, int action )
 	fsd_log_return(( "" ));
 }
 
+static bool _task_id_in_job(job_info_t *job_ptr, uint32_t array_id)
+{
+	uint32_t from = 0, to = 0;
+
+	if (array_id == 0 || array_id == job_ptr->array_task_id) {
+		return true;
+	}
+
+	/* slurm bitstring API is not exported, so parse the string instead */
+	if (!job_ptr->array_task_str) {
+		return false;
+	}
+	if (sscanf(job_ptr->array_task_str, "%u-%u", &from, &to) != 0) {
+		return false;
+	}
+
+	return (array_id >= from && array_id <= to);
+}
 
 static void
 slurmdrmaa_job_update_status( fsd_job_t *self )
 {
 	job_info_msg_t *job_info = NULL;
+	job_info_t *job_ptr = NULL;
+	unsigned i = 0;
 	slurmdrmaa_job_t * slurm_self = (slurmdrmaa_job_t *) self;
 	job_id_spec_t job_id_spec;
 
@@ -135,14 +155,21 @@ slurmdrmaa_job_update_status( fsd_job_t *self )
 				fsd_exc_raise_fmt(FSD_ERRNO_INTERNAL_ERROR,"slurm_load_jobs error: %s,job_id: %s", slurm_strerror(slurm_get_errno()), self->job_id);
 			}
 		}
-		if (job_info) {
-			fsd_log_debug(("state = %d, state_reason = %d", job_info->job_array[0].job_state, job_info->job_array[0].state_reason));
+		for (i = 0, job_ptr = job_info->job_array;
+		     i < job_info->record_count; i++, job_ptr++) {
+
+			/* Match ArrayTaskId if specified. */
+			if (!_task_id_in_job(job_ptr, job_id_spec.array_id)) {
+				continue;
+			}
+
+			fsd_log_debug(("state = %d, state_reason = %d", job_ptr->job_state, job_ptr->state_reason));
 			
-			switch(job_info->job_array[0].job_state & JOB_STATE_BASE)
+			switch(job_ptr->job_state & JOB_STATE_BASE)
 			{
 
 				case JOB_PENDING:
-					switch(job_info->job_array[0].state_reason)
+					switch(job_ptr->state_reason)
 					{
 						#if SLURM_VERSION_NUMBER >= SLURM_VERSION_NUM(2,2,0)
 						case WAIT_HELD_USER:   /* job is held by user */
@@ -175,7 +202,7 @@ slurmdrmaa_job_update_status( fsd_job_t *self )
 				case JOB_COMPLETE:
 					fsd_log_debug(("interpreting as DRMAA_PS_DONE"));
 					self->state = DRMAA_PS_DONE;
-					self->exit_status = job_info->job_array[0].exit_code;
+					self->exit_status = job_ptr->exit_code;
 					fsd_log_debug(("exit_status = %d -> %d",self->exit_status, WEXITSTATUS(self->exit_status)));
 					break;
 				case JOB_CANCELLED:
@@ -190,18 +217,18 @@ slurmdrmaa_job_update_status( fsd_job_t *self )
 				#endif
 					fsd_log_debug(("interpreting as DRMAA_PS_FAILED"));
 					self->state = DRMAA_PS_FAILED;
-					self->exit_status = job_info->job_array[0].exit_code;
+					self->exit_status = job_ptr->exit_code;
 					fsd_log_debug(("exit_status = %d -> %d",self->exit_status, WEXITSTATUS(self->exit_status)));
 					break;
 				default: /*unknown state */
-					fsd_log_error(("Unknown job state: %d. Please send bug report: http://apps.man.poznan.pl/trac/slurm-drmaa", job_info->job_array[0].job_state));
+					fsd_log_error(("Unknown job state: %d. Please send bug report: http://apps.man.poznan.pl/trac/slurm-drmaa", job_ptr->job_state));
 			}
 
-			if (job_info->job_array[0].job_state & JOB_STATE_FLAGS & JOB_COMPLETING) {
+			if (job_ptr->job_state & JOB_STATE_FLAGS & JOB_COMPLETING) {
 				fsd_log_debug(("Epilog completing"));
 			}
 
-			if (job_info->job_array[0].job_state & JOB_STATE_FLAGS & JOB_CONFIGURING) {
+			if (job_ptr->job_state & JOB_STATE_FLAGS & JOB_CONFIGURING) {
 				fsd_log_debug(("Nodes booting"));
 			}
 

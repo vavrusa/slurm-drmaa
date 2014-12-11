@@ -20,6 +20,7 @@
 #include <drmaa_utils/exception.h>
 #include <slurm_drmaa/util.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include <time.h>
 #include <drmaa_utils/datetime.h>
@@ -620,8 +621,19 @@ slurmdrmaa_set_job_id(job_id_spec_t *job_id_spec)
 	char *ctxt = NULL;
 	char *job_id_copy = fsd_strdup(job_id_spec->original);
 	char *job_id_r = NULL;
+	char *job_array = strchr(job_id_copy, '_');
+	char *end_ptr = NULL;
 
 	fsd_log_enter(( "({job_id=%s})", job_id_copy));
+
+	if (job_array)
+	{
+		job_id_spec->array_id = strtol(job_array + 1, &end_ptr, 10);
+		fsd_log_debug(( "array_id = %ld", job_id_spec->array_id ));
+		memmove(job_array, end_ptr, strlen(end_ptr) + 1);
+	} else {
+		job_id_spec->array_id = 0;
+	}
 
 	if (strchr(job_id_copy, '.'))
 	{

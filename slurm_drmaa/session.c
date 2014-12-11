@@ -19,6 +19,7 @@
 
 #include <string.h>
 #include <unistd.h>
+#include <assert.h>
 
 #include <drmaa_utils/iter.h>
 #include <drmaa_utils/conf.h>
@@ -99,25 +100,25 @@ slurmdrmaa_session_run_bulk(
 		const fsd_template_t *jt,
 		int start, int end, int incr )
 {
+	int ret = 0;
+	unsigned i = 0;
+	uint32_t job_id = 0;
 	fsd_job_t *volatile job = NULL;
-	unsigned n_jobs = 1;
-	char **volatile job_ids = NULL;
+	volatile unsigned n_jobs = (end - start) / incr + 1;
+	char ** volatile job_ids = fsd_calloc( job_ids, n_jobs + 1, char* );
 	volatile bool connection_lock = false;
 	fsd_environ_t *volatile env = NULL;
 	job_desc_msg_t job_desc;
 	submit_response_msg_t *submit_response = NULL;
-	job_info_msg_t *job_info = NULL;
-	int ret = 0;
-	unsigned i = 0;
 
-	n_jobs = (end - start) / incr + 1;
-	job_ids = fsd_calloc( job_ids, n_jobs + 1, char* );
+	slurmdrmaa_init_job_desc( &job_desc );
 
 	TRY
 	{
 			connection_lock = fsd_mutex_lock( &self->drm_connection_mutex );
 			slurmdrmaa_job_create_req( self, jt, (fsd_environ_t**)&env , &job_desc, 0 );
 
+			/* Create job array spec if more than 1 task */
 			if(n_jobs > 1)
 			{
 				fsd_calloc(job_desc.array_inx, ARRAY_INX_MAXLEN, char*);
@@ -125,31 +126,35 @@ slurmdrmaa_session_run_bulk(
 				if (ret < 0 || ret >= ARRAY_INX_MAXLEN) {
 					fsd_exc_raise_fmt(FSD_ERRNO_INTERNAL_ERROR, "snprintf: not enough memory");
 				}
+				fsd_log_debug(("array job '%s' prepared", job_desc.array_inx));
 			}
 
-			if(slurm_submit_batch_job(&job_desc, &submit_response)){
+			/* Submit the batch job */
+			if(slurm_submit_batch_job(&job_desc, &submit_response) != SLURM_SUCCESS){
 				fsd_exc_raise_fmt(
 					FSD_ERRNO_INTERNAL_ERROR,"slurm_submit_batch_job: %s",slurm_strerror(slurm_get_errno()));
 			}
 
-			if (!working_cluster_rec)
-				fsd_log_debug(("job %u submitted", submit_response->job_id));
-			else
-				fsd_log_debug(("job %u submitted on cluster %s", submit_response->job_id, working_cluster_rec->name));
-
-			ret = slurm_load_job(&job_info, submit_response->job_id, 0);
-			if (ret != SLURM_SUCCESS || job_info->record_count != n_jobs) {
-				fsd_exc_raise_fmt( FSD_ERRNO_INTERNAL_ERROR,"slurm_load_job: %s",slurm_strerror(slurm_get_errno()));
-			}
-
 			connection_lock = fsd_mutex_unlock( &self->drm_connection_mutex );
 
-			for(i = 0; i < job_info->record_count; i++) {
-				if (!working_cluster_rec)
-					job_ids[i] = fsd_asprintf( "%d", job_info->job_array[i].job_id); /* .0*/
-				else
-					job_ids[i] = fsd_asprintf("%d.%s", job_info->job_array[i].job_id, working_cluster_rec->name);
+			/* Watch each job in the array */
+			for (i = 0; i < n_jobs; ++i) {
+				job_id = submit_response->job_id;
+				if (n_jobs > 1) {
+					/* Array job */
+					if (!working_cluster_rec)
+						job_ids[i] = fsd_asprintf("%d_%d", job_id, i + 1); /* .0*/
+					else
+						job_ids[i] = fsd_asprintf("%d_%d.%s", job_id, i + 1, working_cluster_rec->name);
+				} else {
+					/* Single job */
+					if (!working_cluster_rec)
+						job_ids[i] = fsd_asprintf("%d", job_id); /* .0*/
+					else
+						job_ids[i] = fsd_asprintf("%d.%s", job_id, working_cluster_rec->name);
+				}
 
+				fsd_log_debug(("job %s submitted", job_ids[i]));
 				job = slurmdrmaa_job_new( fsd_strdup(job_ids[i]) );
 				job->session = self;
 				job->submit_time = time(NULL);
@@ -157,8 +162,6 @@ slurmdrmaa_session_run_bulk(
 				job->release( job );
 				job = NULL;
 			}
-
-			slurm_free_job_info_msg(job_info);
 
 			if (working_cluster_rec)
 				slurmdb_destroy_cluster_rec(working_cluster_rec);
@@ -170,24 +173,26 @@ slurmdrmaa_session_run_bulk(
 		if ( !connection_lock )
 			connection_lock = fsd_mutex_lock( &self->drm_connection_mutex );
 
-		slurm_free_submit_response_response_msg ( submit_response );
+		if ( submit_response )
+			slurm_free_submit_response_response_msg ( submit_response );
 	}
 	FINALLY
 	 {
-		
-			
 		if( connection_lock )
 			fsd_mutex_unlock( &self->drm_connection_mutex );
 
 		if( job )
 			job->release( job );
 
-		if( fsd_exc_get() != NULL )
+		if( fsd_exc_get() != NULL ) {
 			fsd_free_vector( job_ids );
-			
+			n_jobs = 0;
+		}
+
 		slurmdrmaa_free_job_desc(&job_desc);
 	 }
 	END_TRY
+
 
 	return fsd_iter_new( job_ids, n_jobs );
 }

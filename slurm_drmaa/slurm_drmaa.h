@@ -24,6 +24,7 @@ typedef struct {
 	char *original;
 	char *job_id;
 	char *cluster;
+	long array_id;
 } job_id_spec_t;
 
 #endif /* __SLURM_DRMAA__SLURM_DRMAA_H */
