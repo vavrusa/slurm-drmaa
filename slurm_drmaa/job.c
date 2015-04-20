@@ -56,7 +56,7 @@ slurmdrmaa_job_control( fsd_job_t *self, int action )
 		switch( action )
 		 {
 			case DRMAA_CONTROL_SUSPEND:
-				if(slurm_suspend(fsd_atoi(self->job_id)) == -1) {
+				if(slurm_suspend(atoi(self->job_id)) == -1) {
 					fsd_exc_raise_fmt(	FSD_ERRNO_INTERNAL_ERROR,"slurm_suspend error: %s,job_id: %s",slurm_strerror(slurm_get_errno()),self->job_id);
 				}
 				slurm_self->user_suspended = true;
@@ -73,7 +73,7 @@ slurmdrmaa_job_control( fsd_job_t *self, int action )
 				}
 				break;
 			case DRMAA_CONTROL_RESUME:
-				if(slurm_resume(fsd_atoi(self->job_id)) == -1) {
+				if(slurm_resume(atoi(self->job_id)) == -1) {
 					fsd_exc_raise_fmt(	FSD_ERRNO_INTERNAL_ERROR,"slurm_resume error: %s,job_id: %s",slurm_strerror(slurm_get_errno()),self->job_id);
 				}
 				slurm_self->user_suspended = false;
@@ -88,7 +88,7 @@ slurmdrmaa_job_control( fsd_job_t *self, int action )
 				}
 				break;
 			case DRMAA_CONTROL_TERMINATE:
-				if(slurm_kill_job(fsd_atoi(self->job_id),SIGKILL,0) == -1) {
+				if(slurm_kill_job(atoi(self->job_id),SIGKILL,0) == -1) {
 					fsd_exc_raise_fmt(	FSD_ERRNO_INTERNAL_ERROR,"slurm_terminate_job error: %s,job_id: %s",slurm_strerror(slurm_get_errno()),self->job_id);
 				}
 				break;
@@ -146,7 +146,7 @@ slurmdrmaa_job_update_status( fsd_job_t *self )
 		job_id_spec.original = self->job_id;
 		self->job_id = slurmdrmaa_set_job_id(&job_id_spec);
 
-		if ( slurm_load_job( &job_info, fsd_atoi(self->job_id), SHOW_ALL) ) {
+		if ( slurm_load_job( &job_info, atoi(self->job_id), SHOW_ALL) ) {
 			int _slurm_errno = slurm_get_errno();
 
 			if (_slurm_errno == ESLURM_INVALID_JOB_ID) {
