@@ -102,7 +102,8 @@ slurmdrmaa_session_run_bulk(
 {
 	int ret = 0;
 	unsigned i = 0;
-	uint32_t job_id = 0;
+	int job_id = 0;
+	int task_id = 0;
 	fsd_job_t *volatile job = NULL;
 	volatile unsigned n_jobs = (end - start) / incr + 1;
 	char ** volatile job_ids = fsd_calloc( job_ids, n_jobs + 1, char* );
@@ -139,13 +140,14 @@ slurmdrmaa_session_run_bulk(
 
 			/* Watch each job in the array */
 			for (i = 0; i < n_jobs; ++i) {
-				job_id = submit_response->job_id;
+				job_id = (int) submit_response->job_id;
+				task_id = start + i*incr;
 				if (n_jobs > 1) {
 					/* Array job */
 					if (!working_cluster_rec)
-						job_ids[i] = fsd_asprintf("%d_%d", job_id, i + 1); /* .0*/
+						job_ids[i] = fsd_asprintf("%d_%d", job_id, task_id); /* .0*/
 					else
-						job_ids[i] = fsd_asprintf("%d_%d.%s", job_id, i + 1, working_cluster_rec->name);
+						job_ids[i] = fsd_asprintf("%d_%d.%s", job_id, task_id, working_cluster_rec->name);
 				} else {
 					/* Single job */
 					if (!working_cluster_rec)
