@@ -148,17 +148,16 @@ slurmdrmaa_job_update_status( fsd_job_t *self )
 
 		if ( slurm_load_job( &job_info, atoi(self->job_id), SHOW_ALL) ) {
 			int _slurm_errno = slurm_get_errno();
-
 			if (_slurm_errno == ESLURM_INVALID_JOB_ID) {
 				self->on_missing(self);
 			} else {
 				fsd_exc_raise_fmt(FSD_ERRNO_INTERNAL_ERROR,"slurm_load_jobs error: %s,job_id: %s", slurm_strerror(slurm_get_errno()), self->job_id);
 			}
 		}
-		for (i = 0, job_ptr = job_info->job_array;
-		     i < job_info->record_count; i++, job_ptr++) {
+		for (i = 0; job_info && i < job_info->record_count; i++) {
 
 			/* Match ArrayTaskId if specified. */
+			job_ptr = job_info->job_array + i;
 			if (!_task_id_in_job(job_ptr, job_id_spec.array_id)) {
 				continue;
 			}
